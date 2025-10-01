@@ -1,0 +1,4 @@
+id,number,title,user,state,created_at,closed_at,comments,open_duration_days
+3471515873,4360,New Beginnings,moniquenhenry86,open,2025-10-01T00:27:16+00:00,,0,
+3461806780,4357,[DRAFT] Feat: Création de compte utilisateur,dust-agent[bot],open,2025-09-28T12:55:26+00:00,,0,
+3455749672,4355,[CjlZRgYFDZ] Updates fail: cannot execute UPDATE in a read-only transaction (postgres tool sets transactions read-only),flexus-caw[bot],open,2025-09-26T04:27:45+00:00,,0,

@@ -2,7 +2,7 @@
 
 import pytest
 from datetime import datetime, timedelta
-from src.repo_miner import fetch_commits #, fetch_issues, merge_and_summarize
+from src.repo_miner import fetch_commits, fetch_issues #, merge_and_summarize
 
 # --- Helpers for dummy GitHub API objects ---
 
@@ -37,7 +37,7 @@ class DummyIssue:
         self.closed_at = closed_at
         self.comments = comments
         # attribute only on pull requests
-        self.pull_request = DummyUser("pr") if is_pr else None
+        self.pull_request = {} if is_pr else None
 
 class DummyRepo:
     def __init__(self, commits, issues):
@@ -74,9 +74,8 @@ def patch_env_and_github(monkeypatch):
 gh_instance = DummyGithub("fake-token")
 
 # --- Tests for fetch_commits ---
-# An example test case
+
 def test_fetch_commits_basic(monkeypatch):
-    # Setup dummy commits
     now = datetime.now()
     commits = [
         DummyCommit("sha1", "Alice", "a@example.com", now, "Initial commit\nDetails"),
@@ -89,7 +88,6 @@ def test_fetch_commits_basic(monkeypatch):
     assert df.iloc[0]["message"] == "Initial commit"
 
 def test_fetch_commits_limit(monkeypatch):
-    # More commits than max_commits
     now = datetime.now()
     commits = [
         DummyCommit("sha1", "Alice", "a@example.com", now, "Initial commit"),
@@ -102,7 +100,41 @@ def test_fetch_commits_limit(monkeypatch):
     assert set(df["sha"]) == {"sha1", "sha2"}
 
 def test_fetch_commits_empty(monkeypatch):
-    # Test that fetch_commits returns empty DataFrame when no commits exist.
     gh_instance._repo = DummyRepo([], [])
     df = fetch_commits("any/repo")
     assert df.empty
+
+# --- Tests for fetch_issues (RM2) ---
+
+def test_fetch_issues_excludes_pull_requests(monkeypatch):
+    now = datetime.now()
+    issues = [
+        DummyIssue(1, 101, "Bug in code", "alice", "open", now, None, 0, is_pr=True),
+        DummyIssue(2, 102, "Normal issue", "bob", "closed", now, now, 2, is_pr=False),
+    ]
+    gh_instance._repo = DummyRepo([], issues)
+    df = fetch_issues("any/repo", state="all")
+    # Only the non-PR issue should remain
+    assert len(df) == 1
+    assert df.iloc[0]["title"] == "Normal issue"
+
+def test_fetch_issues_date_normalization(monkeypatch):
+    now = datetime(2025, 9, 25, 15, 30, 0)
+    issues = [
+        DummyIssue(3, 103, "Check date", "carol", "open", now, None, 1)
+    ]
+    gh_instance._repo = DummyRepo([], issues)
+    df = fetch_issues("any/repo", state="all")
+    # ISO-8601 format check: should contain "T" between date and time
+    assert "T" in df.iloc[0]["created_at"]
+    assert df.iloc[0]["created_at"].startswith("2025-09-25")
+
+def test_fetch_issues_open_duration_days(monkeypatch):
+    created = datetime(2025, 9, 20, 12, 0, 0)
+    closed = datetime(2025, 9, 25, 12, 0, 0)
+    issues = [
+        DummyIssue(4, 104, "Duration test", "dave", "closed", created, closed, 0)
+    ]
+    gh_instance._repo = DummyRepo([], issues)
+    df = fetch_issues("any/repo", state="all")
+    assert df.iloc[0]["open_duration_days"] == 5
